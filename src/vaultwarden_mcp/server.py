@@ -338,15 +338,8 @@ def main() -> None:
 
     app = _build_app(mcp)
 
-    async def gateway(scope, receive, send):
-        if scope["type"] == "http" and scope["method"] == "POST":
-            path = scope.get("path", "")
-            if path.rstrip("/") == "":
-                scope["path"] = "/mcp"
-        await app(scope, receive, send)
-
     uvicorn.run(
-        gateway,
+        app,
         host=os.environ.get("HOST", "0.0.0.0"),
         port=int(os.environ.get("PORT", "8000")),
         forwarded_allow_ips="*",
