@@ -12,7 +12,7 @@ services:
       - ./vw-data:/data
     environment:
       SIGNUPS_ALLOWED: "false"
-      ADMIN_TOKEN: ${VW_ADMIN_TOKEN:-test-admin-12345}
+      ADMIN_TOKEN: ${VW_ADMIN_TOKEN:?required}
 
   vaultwarden-mcp:
     build: .
