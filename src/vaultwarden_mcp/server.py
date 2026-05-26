@@ -265,6 +265,17 @@ def _register_tools(mcp_server: FastMCP) -> None:
         except Exception as e:
             raise InternalError(str(e)) from e
 
+    @mcp_server.tool()
+    async def move_secret(folder: str, item_name: str, target_folder: str) -> dict:
+        """Move a secret to a different folder."""
+        try:
+            await _require_client().move_secret(folder, item_name, target_folder)
+            return {"ok": True}
+        except (NotFoundError, ForbiddenError, InternalError):
+            raise
+        except Exception as e:
+            raise InternalError(str(e)) from e
+
 
 # -- routes ----------------------------------------------------------------
 

@@ -475,6 +475,34 @@ class VaultwardenClient:
             })
         return result
 
+    async def move_secret(self, folder: str, item_name: str, target_folder: str) -> None:
+        f = await self._require_folder(folder)
+        item = await self._find_item(f.id, item_name)
+        if not self._is_mcp_secret(item):
+            raise NotFoundError(f"Item not an MCP secret: {item_name}")
+
+        tf = await self._require_folder(target_folder)
+
+        token = await self._access_token()
+        http = await self._get_http()
+        login = item.get("login") or {}
+        login.pop("password", None)
+        payload = {
+            "type": item["type"],
+            "folderId": tf.id,
+            "name": item["name"],
+            "login": login,
+        }
+        try:
+            resp = await http.put(
+                f"{self._url}/api/ciphers/{item['id']}",
+                headers=self._auth_headers(token),
+                json=payload,
+            )
+            resp.raise_for_status()
+        except httpx.HTTPError as e:
+            raise InternalError(f"Failed to move secret: {e}") from e
+
     # -- startup -------------------------------------------------------------
 
     async def validate(self) -> None:
