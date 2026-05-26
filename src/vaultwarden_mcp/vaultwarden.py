@@ -5,6 +5,7 @@ import logging
 import random
 import time
 import uuid
+from typing import ClassVar
 from dataclasses import dataclass
 
 import httpx
@@ -56,26 +57,28 @@ class _SecretItem:
 
 
 class VaultwardenClient:
+    _shared_http: ClassVar[httpx.AsyncClient | None] = None
+    _shared_token: ClassVar[str | None] = None
+    _shared_token_expiry: ClassVar[float] = 0
+    _shared_device_id: ClassVar[str] = ""
+    _token_lock: ClassVar[asyncio.Lock] = asyncio.Lock()
+
     def __init__(self, config: Config):
         self._url = config.vaultwarden_url
         self._client_id = config.client_id
         self._client_secret = config.client_secret
         self._allowed: list[str] | None = config.allowed_folders
-        self._device_id = str(uuid.uuid4())
 
-        self._http: httpx.AsyncClient | None = None
-        self._token: str | None = None
-        self._token_expiry: float = 0
+        if not VaultwardenClient._shared_device_id:
+            VaultwardenClient._shared_device_id = str(uuid.uuid4())
 
         self._folders: dict[str, _Folder] = {}
         self._folder_loaded = False
 
-        self._retry_lock = asyncio.Lock()
-
     async def _get_http(self) -> httpx.AsyncClient:
-        if self._http is None:
-            self._http = httpx.AsyncClient(timeout=httpx.Timeout(10.0))
-        return self._http
+        if VaultwardenClient._shared_http is None:
+            VaultwardenClient._shared_http = httpx.AsyncClient(timeout=httpx.Timeout(10.0))
+        return VaultwardenClient._shared_http
 
     # -- auth ----------------------------------------------------------------
 
@@ -90,7 +93,7 @@ class VaultwardenClient:
                     f"&client_id={self._client_id}"
                     f"&client_secret={self._client_secret}"
                     f"&scope=api"
-                    f"&device_identifier={self._device_id}"
+                    f"&device_identifier={VaultwardenClient._shared_device_id}"
                     f"&device_name=vaultwarden-mcp"
                     f"&device_type={DEVICE_TYPE_SDK}"
                 ),
@@ -101,23 +104,29 @@ class VaultwardenClient:
         except httpx.HTTPError as e:
             raise InternalError(f"Token exchange failed: {e}") from e
 
-        self._token = data["access_token"]
+        VaultwardenClient._shared_token = data["access_token"]
         expires_in = data.get("expires_in", 7200)
-        self._token_expiry = time.time() + expires_in
+        VaultwardenClient._shared_token_expiry = time.time() + expires_in
         logger.info("Token obtained, expires in %d seconds", expires_in)
 
     async def _access_token(self) -> str:
-        if self._token is not None and time.time() < self._token_expiry - 300:
-            return self._token
+        if (
+            VaultwardenClient._shared_token is not None
+            and time.time() < VaultwardenClient._shared_token_expiry - 300
+        ):
+            return VaultwardenClient._shared_token
 
-        async with self._retry_lock:
-            if self._token is not None and time.time() < self._token_expiry - 300:
-                return self._token
+        async with VaultwardenClient._token_lock:
+            if (
+                VaultwardenClient._shared_token is not None
+                and time.time() < VaultwardenClient._shared_token_expiry - 300
+            ):
+                return VaultwardenClient._shared_token
 
             for attempt in range(3):
                 try:
                     await self._exchange_token()
-                    return self._token
+                    return VaultwardenClient._shared_token
                 except InternalError:
                     if attempt == 2:
                         raise
@@ -525,6 +534,6 @@ class VaultwardenClient:
                 logger.warning("Folder %r in allowed_folders not found in Vaultwarden", folder_name)
 
     async def close(self) -> None:
-        if self._http is not None:
-            await self._http.aclose()
-            self._http = None
+        if VaultwardenClient._shared_http is not None:
+            await VaultwardenClient._shared_http.aclose()
+            VaultwardenClient._shared_http = None
