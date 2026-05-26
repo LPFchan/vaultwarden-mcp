@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+vw-data/
+*.egg-info/
+dist/
+.env
+config/

@@ -1,0 +1,37 @@
+services:
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    mem_limit: 256m
+    memswap_limit: 256m
+    oom_score_adj: 500
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8081:80"
+    volumes:
+      - ./vw-data:/data
+    environment:
+      SIGNUPS_ALLOWED: "false"
+      ADMIN_TOKEN: ${VW_ADMIN_TOKEN:-test-admin-12345}
+
+  vaultwarden-mcp:
+    build: .
+    container_name: vaultwarden-mcp
+    user: "1001:1001"
+    mem_limit: 128m
+    memswap_limit: 128m
+    oom_score_adj: 500
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8002:8000"
+    volumes:
+      - ./config/config.json:/config/config.json:ro
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8000
+      VAULTWARDEN_MCP_AUTH_TOKEN: ${VAULTWARDEN_MCP_AUTH_TOKEN:-}
+      VAULTWARDEN_URL: http://vaultwarden:80
+      VAULTWARDEN_CLIENT_ID: ${VAULTWARDEN_CLIENT_ID}
+      VAULTWARDEN_CLIENT_SECRET: ${VAULTWARDEN_CLIENT_SECRET}
+    depends_on:
+      - vaultwarden
