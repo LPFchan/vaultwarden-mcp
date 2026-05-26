@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 import time
 import uuid
 from dataclasses import dataclass
@@ -120,8 +121,8 @@ class VaultwardenClient:
                 except InternalError:
                     if attempt == 2:
                         raise
-                    wait = 5 * (2 ** attempt)
-                    logger.warning("Token exchange attempt %d failed, retrying in %ds", attempt + 1, wait)
+                    wait = (5 + random.uniform(0, 5)) * (2 ** attempt)
+                    logger.warning("Token exchange attempt %d failed, retrying in %.1fs", attempt + 1, wait)
                     await asyncio.sleep(wait)
             raise InternalError("Token exchange failed after 3 attempts")
 

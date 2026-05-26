@@ -159,8 +159,9 @@ def _build_lifespan(config_path: str):
         try:
             yield
         finally:
-            await _client.close()
-            _client = None
+            if _client is not None:
+                await _client.close()
+                _client = None
 
     return lifespan
 
