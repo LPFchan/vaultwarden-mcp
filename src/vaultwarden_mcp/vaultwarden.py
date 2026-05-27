@@ -537,17 +537,23 @@ class VaultwardenClient:
             raise InternalError(f"Failed to rename secret: {e}") from e
 
     async def empty_trash(self) -> None:
+        await self._ensure_folders()
+        ciphers = await self._fetch_all_ciphers()
+        trashed_ids = [c["id"] for c in ciphers if c.get("deletedDate") and self._is_mcp_secret(c)]
+        if not trashed_ids:
+            return
+
         token = await self._access_token()
         http = await self._get_http()
-        try:
-            resp = await http.post(
-                f"{self._url}/api/ciphers/purge",
-                headers=self._auth_headers(token),
-                json={},
-            )
-            resp.raise_for_status()
-        except httpx.HTTPError as e:
-            raise InternalError(f"Failed to empty trash: {e}") from e
+        for cid in trashed_ids:
+            try:
+                resp = await http.delete(
+                    f"{self._url}/api/ciphers/{cid}",
+                    headers=self._auth_headers(token),
+                )
+                resp.raise_for_status()
+            except httpx.HTTPError as e:
+                raise InternalError(f"Failed to empty trash: {e}") from e
 
     # -- startup -------------------------------------------------------------
 
