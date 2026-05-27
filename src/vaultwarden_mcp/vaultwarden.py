@@ -451,7 +451,7 @@ class VaultwardenClient:
 
         ciphers = await self._fetch_all_ciphers()
         for c in ciphers:
-            if c.get("folderId") == f.id:
+            if c.get("folderId") == f.id and not c.get("deletedDate"):
                 raise ConflictError(f"Folder not empty: {folder}")
 
         token = await self._access_token()
@@ -466,54 +466,87 @@ class VaultwardenClient:
         except httpx.HTTPError as e:
             raise InternalError(f"Failed to delete folder: {e}") from e
 
-    async def list_trash(self) -> list[dict]:
+    async def rename_folder(self, folder: str, new_name: str) -> None:
         await self._ensure_folders()
-        ciphers = await self._fetch_all_ciphers()
-        folder_id_to_name = {f.id: f.name for f in self._folders.values()}
-        result = []
-        for item in ciphers:
-            if not item.get("deletedDate"):
-                continue
-            if not self._is_mcp_secret(item):
-                continue
-            fid = item.get("folderId")
-            fname = folder_id_to_name.get(fid, "(no folder)")
-            if self._allowed is not None and fname not in self._allowed:
-                continue
-            result.append({
-                "folder": fname,
-                "name": item["name"],
-                "deletedDate": item["deletedDate"],
-            })
-        return result
+        f = self._resolve_folder(folder)
+        if f is None:
+            raise NotFoundError(f"Folder not found: {folder}")
+        if new_name in self._folders:
+            raise ConflictError(f"Folder already exists: {new_name}")
+
+        token = await self._access_token()
+        http = await self._get_http()
+        try:
+            resp = await http.put(
+                f"{self._url}/api/folders/{f.id}",
+                headers=self._auth_headers(token),
+                json={"name": new_name},
+            )
+            resp.raise_for_status()
+        except httpx.HTTPError as e:
+            raise InternalError(f"Failed to rename folder: {e}") from e
+
+        old_allowed = self._allowed
+        self._folders[new_name] = _Folder(id=f.id, name=new_name)
+        del self._folders[folder]
+        if old_allowed is not None and folder in old_allowed:
+            old_allowed[old_allowed.index(folder)] = new_name
 
     async def move_secret(self, folder: str, item_name: str, target_folder: str) -> None:
         f = await self._require_folder(folder)
         item = await self._find_item(f.id, item_name)
         if not self._is_mcp_secret(item):
             raise NotFoundError(f"Item not an MCP secret: {item_name}")
-
         tf = await self._require_folder(target_folder)
-
         token = await self._access_token()
         http = await self._get_http()
         login = item.get("login") or {}
         login.pop("password", None)
-        payload = {
-            "type": item["type"],
-            "folderId": tf.id,
-            "name": item["name"],
-            "login": login,
-        }
+        payload = {"type": item["type"], "folderId": tf.id, "name": item["name"], "login": login}
         try:
             resp = await http.put(
                 f"{self._url}/api/ciphers/{item['id']}",
-                headers=self._auth_headers(token),
-                json=payload,
+                headers=self._auth_headers(token), json=payload,
             )
             resp.raise_for_status()
         except httpx.HTTPError as e:
             raise InternalError(f"Failed to move secret: {e}") from e
+
+    async def rename_secret(self, folder: str, item_name: str, new_name: str) -> None:
+        f = await self._require_folder(folder)
+        item = await self._find_item(f.id, item_name)
+        if not self._is_mcp_secret(item):
+            raise NotFoundError(f"Item not an MCP secret: {item_name}")
+        try:
+            await self._find_item(f.id, new_name)
+            raise ConflictError(f"Item already exists: {new_name}")
+        except NotFoundError:
+            pass
+        token = await self._access_token()
+        http = await self._get_http()
+        login = item.get("login") or {}
+        login.pop("password", None)
+        payload = {"type": item["type"], "folderId": item["folderId"], "name": new_name, "login": login}
+        try:
+            resp = await http.put(
+                f"{self._url}/api/ciphers/{item['id']}",
+                headers=self._auth_headers(token), json=payload,
+            )
+            resp.raise_for_status()
+        except httpx.HTTPError as e:
+            raise InternalError(f"Failed to rename secret: {e}") from e
+
+    async def empty_trash(self) -> None:
+        token = await self._access_token()
+        http = await self._get_http()
+        try:
+            resp = await http.delete(
+                f"{self._url}/api/ciphers",
+                headers=self._auth_headers(token),
+            )
+            resp.raise_for_status()
+        except httpx.HTTPError as e:
+            raise InternalError(f"Failed to empty trash: {e}") from e
 
     # -- startup -------------------------------------------------------------
 

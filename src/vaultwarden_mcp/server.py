@@ -277,6 +277,39 @@ def _register_tools(mcp_server: FastMCP) -> None:
         except Exception as e:
             raise InternalError(str(e)) from e
 
+    @mcp_server.tool()
+    async def rename_secret(folder: str, item_name: str, new_name: str) -> dict:
+        """Rename a secret (keeps the same value and folder)."""
+        try:
+            await _require_client().rename_secret(folder, item_name, new_name)
+            return {"ok": True}
+        except (NotFoundError, ForbiddenError, ConflictError, InternalError):
+            raise
+        except Exception as e:
+            raise InternalError(str(e)) from e
+
+    @mcp_server.tool()
+    async def rename_folder(folder: str, new_name: str) -> dict:
+        """Rename a folder."""
+        try:
+            await _require_client().rename_folder(folder, new_name)
+            return {"ok": True}
+        except (NotFoundError, ConflictError, InternalError):
+            raise
+        except Exception as e:
+            raise InternalError(str(e)) from e
+
+    @mcp_server.tool()
+    async def empty_trash() -> dict:
+        """Permanently delete all soft-deleted items in trash."""
+        try:
+            await _require_client().empty_trash()
+            return {"ok": True}
+        except InternalError:
+            raise
+        except Exception as e:
+            raise InternalError(str(e)) from e
+
 
 # -- routes ----------------------------------------------------------------
 
