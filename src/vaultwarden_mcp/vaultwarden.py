@@ -439,6 +439,9 @@ class VaultwardenClient:
         except httpx.HTTPError as e:
             raise InternalError(f"Failed to create folder: {e}") from e
 
+        if self._allowed is not None and folder not in self._allowed:
+            self._allowed.append(folder)
+
     async def delete_folder(self, folder: str) -> None:
         self._check_allowed(folder)
         await self._ensure_folders()
@@ -531,6 +534,12 @@ class VaultwardenClient:
         for folder_name in (self._allowed or []):
             if folder_name not in self._folders:
                 logger.warning("Folder %r in allowed_folders not found in Vaultwarden", folder_name)
+
+        if self._allowed is not None:
+            for folder_name in self._folders:
+                if folder_name not in self._allowed:
+                    self._allowed.append(folder_name)
+                    logger.info("Auto-allowed existing folder: %s", folder_name)
 
     async def close(self) -> None:
         if VaultwardenClient._shared_http is not None:
