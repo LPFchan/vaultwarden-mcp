@@ -13,6 +13,8 @@ services:
     environment:
       SIGNUPS_ALLOWED: "false"
       ADMIN_TOKEN: ${VW_ADMIN_TOKEN:?required}
+      LOGIN_RATELIMIT_SECONDS: 30
+      LOGIN_RATELIMIT_MAX_BURST: 20
 
   vaultwarden-mcp:
     build: .
