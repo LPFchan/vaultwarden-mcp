@@ -420,7 +420,6 @@ class VaultwardenClient:
             raise InternalError(f"Failed to recover secret: {e}") from e
 
     async def add_folder(self, folder: str) -> None:
-        self._check_allowed(folder)
         await self._ensure_folders()
         if folder in self._folders:
             raise ConflictError(f"Folder already exists: {folder}")
