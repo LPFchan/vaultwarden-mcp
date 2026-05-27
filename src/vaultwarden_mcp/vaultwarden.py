@@ -210,6 +210,11 @@ class VaultwardenClient:
         return False
 
     @staticmethod
+    def _item_username(item: dict) -> str:
+        login = item.get("login") or {}
+        return login.get("username") or ""
+
+    @staticmethod
     def _item_password(item: dict) -> str:
         login = item.get("login") or {}
         return login.get("password") or ""
@@ -265,6 +270,35 @@ class VaultwardenClient:
             raise DuplicateError(f"Multiple items named '{item_name}' in folder '{folder}'")
 
         return self._item_password(matches[0])
+
+    async def get_login(self, folder: str, item_name: str) -> dict:
+        if self._allowed is not None and folder not in self._allowed:
+            raise ForbiddenError(f"Folder not in allowed_folders: {folder}")
+
+        await self._ensure_folders()
+        f = self._resolve_folder(folder)
+        if f is None:
+            raise NotFoundError(f"Folder not found: {folder}")
+
+        ciphers = await self._fetch_all_ciphers()
+        matches: list[dict] = []
+        for item in ciphers:
+            if not self._is_mcp_secret(item):
+                continue
+            if item.get("folderId") != f.id:
+                continue
+            if item["name"] == item_name:
+                matches.append(item)
+
+        if len(matches) == 0:
+            raise NotFoundError(f"Item not found: {item_name}")
+        if len(matches) > 1:
+            raise DuplicateError(f"Multiple items named '{item_name}' in folder '{folder}'")
+
+        return {
+            "username": self._item_username(matches[0]),
+            "password": self._item_password(matches[0]),
+        }
 
     async def list_secrets(self, folder: str | None = None) -> list[dict]:
         if folder is not None:
@@ -352,6 +386,36 @@ class VaultwardenClient:
             resp.raise_for_status()
         except httpx.HTTPError as e:
             raise InternalError(f"Failed to create secret: {e}") from e
+
+    async def add_login(self, folder: str, item_name: str, username: str, password: str) -> None:
+        f = await self._require_folder(folder)
+        try:
+            await self._find_item(f.id, item_name)
+            raise ConflictError(f"Item already exists: {item_name}")
+        except NotFoundError:
+            pass
+
+        token = await self._access_token()
+        http = await self._get_http()
+        payload = {
+            "type": LOGIN_TYPE,
+            "folderId": f.id,
+            "name": item_name,
+            "login": {
+                "username": username,
+                "password": password,
+                "uris": [{"uri": MCP_URI, "match": None}],
+            },
+        }
+        try:
+            resp = await http.post(
+                f"{self._url}/api/ciphers",
+                headers=self._auth_headers(token),
+                json=payload,
+            )
+            resp.raise_for_status()
+        except httpx.HTTPError as e:
+            raise InternalError(f"Failed to create login: {e}") from e
 
     async def edit_secret(self, folder: str, item_name: str, value: str) -> None:
         f = await self._require_folder(folder)

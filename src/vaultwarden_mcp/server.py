@@ -181,6 +181,16 @@ def _register_tools(mcp_server: FastMCP) -> None:
             raise InternalError(str(e)) from e
 
     @mcp_server.tool()
+    async def get_login(folder: str, item_name: str) -> dict:
+        """Retrieve a full login entry (username and password) from Vaultwarden."""
+        try:
+            return await _require_client().get_login(folder, item_name)
+        except (NotFoundError, ForbiddenError, DuplicateError, InternalError):
+            raise
+        except Exception as e:
+            raise InternalError(str(e)) from e
+
+    @mcp_server.tool()
     async def list_secrets(folder: str | None = None) -> list[dict]:
         """List available secret names (never the values themselves)."""
         try:
@@ -195,6 +205,17 @@ def _register_tools(mcp_server: FastMCP) -> None:
         """Add a new secret to a folder. Auto-tags with mcp-secret:// URI."""
         try:
             await _require_client().add_secret(folder, item_name, value)
+            return {"ok": True}
+        except (NotFoundError, ForbiddenError, ConflictError, InternalError):
+            raise
+        except Exception as e:
+            raise InternalError(str(e)) from e
+
+    @mcp_server.tool()
+    async def add_login(folder: str, item_name: str, username: str, password: str) -> dict:
+        """Add a new login entry (username + password) to a folder."""
+        try:
+            await _require_client().add_login(folder, item_name, username, password)
             return {"ok": True}
         except (NotFoundError, ForbiddenError, ConflictError, InternalError):
             raise
