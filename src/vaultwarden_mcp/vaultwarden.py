@@ -540,9 +540,10 @@ class VaultwardenClient:
         token = await self._access_token()
         http = await self._get_http()
         try:
-            resp = await http.delete(
-                f"{self._url}/api/ciphers",
+            resp = await http.post(
+                f"{self._url}/api/ciphers/purge",
                 headers=self._auth_headers(token),
+                json={},
             )
             resp.raise_for_status()
         except httpx.HTTPError as e:
