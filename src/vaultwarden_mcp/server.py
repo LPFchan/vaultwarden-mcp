@@ -131,6 +131,12 @@ class _AuthMiddleware:
             await self.app(scope, receive, send)
             return
 
+        first_segment = path.strip("/").split("/")[0] if path.strip("/") else ""
+        if first_segment in self._tokens:
+            scope["path"] = "/" + "/".join(path.strip("/").split("/")[1:])
+            await self.app(scope, receive, send)
+            return
+
         await send({"type": "http.response.start", "status": 401, "headers": [(b"content-type", b"application/json")]})
         await send({"type": "http.response.body", "body": b'{"error":"Unauthorized"}'})
 
