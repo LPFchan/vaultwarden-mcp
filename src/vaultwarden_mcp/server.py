@@ -337,6 +337,16 @@ def _register_tools(mcp_server: FastMCP) -> None:
         except Exception as e:
             raise InternalError(str(e)) from e
 
+    @mcp_server.tool()
+    async def search_secrets(query: str) -> list[dict]:
+        """Search secrets by name across all folders. Returns folder + item_name for each match."""
+        try:
+            return await _require_client().search_secrets(query)
+        except InternalError:
+            raise
+        except Exception as e:
+            raise InternalError(str(e)) from e
+
 
 # -- routes ----------------------------------------------------------------
 

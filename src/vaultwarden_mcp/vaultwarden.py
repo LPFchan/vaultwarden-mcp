@@ -645,7 +645,20 @@ class VaultwardenClient:
                     self._allowed.append(folder_name)
                     logger.info("Auto-allowed existing folder: %s", folder_name)
 
+    async def search_secrets(self, query: str) -> list[dict]:
+        q = query.strip().lower()
+        if not q:
+            return []
+
+        secrets = await self._all_secrets()
+        results: list[dict] = []
+        for f_name, items in sorted(secrets.items()):
+            if self._allowed is not None and f_name not in self._allowed:
+                continue
+            for item in items:
+                if q in item.name.lower():
+                    results.append({"folder": f_name, "item_name": item.name})
+        return results
+
     async def close(self) -> None:
-        if VaultwardenClient._shared_http is not None:
-            await VaultwardenClient._shared_http.aclose()
-            VaultwardenClient._shared_http = None
+        pass
