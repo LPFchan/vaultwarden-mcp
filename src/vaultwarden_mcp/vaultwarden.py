@@ -565,7 +565,6 @@ class VaultwardenClient:
         token = await self._access_token()
         http = await self._get_http()
         login = item.get("login") or {}
-        login.pop("password", None)
         payload = {"type": item["type"], "folderId": tf.id, "name": item["name"], "login": login}
         try:
             resp = await http.put(
@@ -589,7 +588,6 @@ class VaultwardenClient:
         token = await self._access_token()
         http = await self._get_http()
         login = item.get("login") or {}
-        login.pop("password", None)
         payload = {"type": item["type"], "folderId": item["folderId"], "name": new_name, "login": login}
         try:
             resp = await http.put(
