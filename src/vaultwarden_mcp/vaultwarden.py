@@ -530,6 +530,14 @@ class VaultwardenClient:
         except httpx.HTTPError as e:
             raise InternalError(f"Failed to delete folder: {e}") from e
 
+    async def list_folders(self) -> list[dict]:
+        """List all folders with their IDs."""
+        await self._ensure_folders()
+        return [
+            {"id": f.id, "name": f.name}
+            for f in self._folders.values()
+        ]
+
     async def rename_folder(self, folder: str, new_name: str) -> None:
         await self._ensure_folders()
         f = self._resolve_folder(folder)

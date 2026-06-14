@@ -316,6 +316,16 @@ def _register_tools(mcp_server: FastMCP) -> None:
             raise InternalError(str(e)) from e
 
     @mcp_server.tool()
+    async def list_folders() -> list[dict]:
+        """List all folders with their IDs."""
+        try:
+            return await _require_client().list_folders()
+        except InternalError:
+            raise
+        except Exception as e:
+            raise InternalError(str(e)) from e
+
+    @mcp_server.tool()
     async def rename_folder(folder: str, new_name: str) -> dict:
         """Rename a folder."""
         try:

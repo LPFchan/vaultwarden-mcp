@@ -13,8 +13,10 @@ services:
     environment:
       SIGNUPS_ALLOWED: "false"
       ADMIN_TOKEN: ${VW_ADMIN_TOKEN:?required}
-      LOGIN_RATELIMIT_SECONDS: 30
-      LOGIN_RATELIMIT_MAX_BURST: 20
+      LOGIN_RATELIMIT_SECONDS: 5
+      LOGIN_RATELIMIT_MAX_BURST: 100
+      ADMIN_RATELIMIT_SECONDS: 5
+      ADMIN_RATELIMIT_MAX_BURST: 100
 
   vaultwarden-mcp:
     build: .
@@ -35,5 +37,6 @@ services:
       VAULTWARDEN_URL: http://vaultwarden:80
       VAULTWARDEN_CLIENT_ID: ${VAULTWARDEN_CLIENT_ID}
       VAULTWARDEN_CLIENT_SECRET: ${VAULTWARDEN_CLIENT_SECRET}
+
     depends_on:
       - vaultwarden
